@@ -1,106 +1,173 @@
-# PhishGuard: Domain-Aware Phishing URL Detector
+# Machine Learning Based Phishing URL Detection System for Web Browser
 
-PhishGuard is an educational cybersecurity project that estimates whether a URL resembles phishing examples. It combines hostname analysis, URL structure analysis, and character-pattern machine learning in a local Python backend. It also includes a Manifest V3 browser extension for Brave and Google Chrome.
+A machine learning based URL detection system that analyzes domain characteristics, URL structure, and character patterns to estimate whether a submitted URL resembles a phishing URL. The system includes a Python backend, a web interface, and a Manifest V3 browser extension compatible with Google Chrome and Brave.
 
-> **Important:** PhishGuard is a student prototype, not an antivirus product or a browser safe-browsing replacement. A warning is not proof that a URL is malicious, and a low score is not proof that it is safe. The system does not inspect page content or query live domain reputation services.
+> **Important:** This system is a prototype for phishing URL detection. It is not an antivirus product or a replacement for browser safe browsing features. A warning does not prove that a URL is malicious, and a low phishing score does not guarantee that a URL is safe.
 
-## Contents
+## Table of Contents
 
-- [Features](#features)
-- [How it works](#how-it-works)
-- [Project structure](#project-structure)
-- [Requirements](#requirements)
-- [Windows setup](#windows-setup)
-- [Run the web interface](#run-the-web-interface)
-- [Install the browser extension](#install-the-browser-extension)
-- [API reference](#api-reference)
-- [Tests and model evaluation](#tests-and-model-evaluation)
-- [Dataset and generated model](#dataset-and-generated-model)
-- [Limitations and responsible use](#limitations-and-responsible-use)
-- [Attribution and licensing](#attribution-and-licensing)
-- [Troubleshooting](#troubleshooting)
+1. [Overview](#overview)
+2. [Features](#features)
+3. [How the System Works](#how-the-system-works)
+4. [Project Structure](#project-structure)
+5. [Requirements](#requirements)
+6. [Installation and Setup](#installation-and-setup)
+7. [Running the System](#running-the-system)
+8. [Installing the Browser Extension](#installing-the-browser-extension)
+9. [Using the System](#using-the-system)
+10. [API Reference](#api-reference)
+11. [Testing and Model Evaluation](#testing-and-model-evaluation)
+12. [Dataset and Model Training](#dataset-and-model-training)
+13. [Limitations](#limitations)
+14. [Troubleshooting](#troubleshooting)
+15. [Additional Documentation](#additional-documentation)
+
+## Overview
+
+The Machine Learning Based Phishing URL Detection System for Web Browser analyzes submitted URLs using a combination of domain analysis, URL structure analysis, and machine learning.
+
+Unlike a basic detector that relies mainly on URL length and special character counts, this system extracts multiple features from the hostname, domain, subdomain, path, and query parameters. It also uses character n-grams to learn patterns in URL text from labeled training examples.
+
+The system provides a phishing classification result, an estimated phishing score, and observations that help explain the characteristics identified during analysis.
+
+The application runs locally on the user's computer. The browser extension communicates with the local Python backend to analyze URLs.
 
 ## Features
 
-- **Domain analysis:** extracts the hostname, registered domain, public suffix, subdomain depth, IP-address indicators, IDN/punycode indicators, hostname character statistics, and selected suspicious wording and brand-token patterns.
-- **Hostname character patterns:** uses character n-grams to learn spelling fragments from hostname examples, which can help identify lookalike patterns that counts alone cannot express.
-- **Path and query patterns:** analyzes path and query character n-grams plus URL structure signals such as path depth, query parameters, percent encoding, user-information syntax, non-standard ports, and suspicious file extensions.
-- **Combined classifier:** combines numeric features with sparse character-pattern features using a scikit-learn classifier.
-- **Domain-disjoint evaluation:** groups examples by registered domain when creating the evaluation split, helping reduce the leakage that can occur when URLs from the same domain appear in both training and testing.
-- **Explanatory results:** presents domain and URL indicators separately and shows an estimated phishing score.
-- **Local operation:** the model and Flask API run on the user's computer. No remote URL-scanning API is configured by default.
-- **Browser extension:** lets a user analyze the URL of the active tab or paste another URL into a popup.
+- **Domain analysis:** Examines hostname structure, registered domain, public suffix, subdomain depth, IP address usage, internationalized domain name indicators, and selected suspicious wording patterns.
+- **Character pattern analysis:** Uses character n-grams to learn patterns from hostnames, URL paths, and query strings.
+- **URL structure analysis:** Examines URL length, path depth, query parameters, percent encoded characters, user information syntax, nonstandard ports, and selected suspicious file extensions.
+- **Combined machine learning model:** Combines numerical URL features with character based features through a scikit-learn pipeline.
+- **Domain aware evaluation:** Uses registered domain groups when splitting data for evaluation to help reduce the risk of similar URLs appearing in both training and test sets.
+- **Explainable results:** Displays the classification result, estimated phishing score, and separate domain and URL observations.
+- **Local backend:** Runs the prediction API on the user's computer without requiring a remote URL scanning API by default.
+- **Web interface:** Allows users to submit URLs through a browser based interface.
+- **Browser extension:** Allows users to analyze the active tab URL or manually enter another URL through a browser popup.
+- **Automated tests:** Includes tests for URL feature extraction, domain handling, and construction of the model's feature pipeline.
 
-## How it works
+## How the System Works
+
+The system has two main workflows: model training and URL prediction.
+
+### 1. Model Training
+
+A labeled dataset containing legitimate and phishing URLs is processed to extract the features used by the machine learning model.
+
+The system combines numerical features with character n-gram features and trains a classifier. It then evaluates the model using a held out domain split and saves the trained model as `phishing_model.pkl`.
+
+### 2. URL Prediction
+
+When a user submits a URL, the backend parses it and extracts the same types of features used during training. The trained model then produces a prediction and an estimated phishing score.
+
+The application returns the result together with domain and URL observations for display in the web interface or browser extension.
 
 ```mermaid
 flowchart TD
-    A[Dataset: labeled URLs] --> B[Parse and extract URL features]
-    B --> C[Domain character n-grams]
-    B --> D[Path and query character n-grams]
-    B --> E[Numeric domain and URL features]
-    C --> F[Combine feature matrices]
+    A[Labeled URL Dataset] --> B[URL Parsing and Feature Extraction]
+    B --> C[Hostname Character Features]
+    B --> D[Path and Query Character Features]
+    B --> E[Domain and URL Numerical Features]
+    C --> F[Combined Feature Pipeline]
     D --> F
     E --> F
-    F --> G[Train and evaluate classifier]
+    F --> G[Train and Evaluate Classifier]
     G --> H[Save phishing_model.pkl]
-    I[Web page or browser extension] --> J[Local Flask API]
+
+    I[Web Interface or Browser Extension] --> J[Local Python API]
     H --> J
-    J --> K[Prediction and domain/URL findings]
-    K --> I
+    J --> K[Analyze Submitted URL]
+    K --> L[Prediction and Explanatory Findings]
+    L --> I
 ```
 
-At prediction time, the frontend sends the URL to the Flask API. The backend validates and parses the URL, constructs the same feature representation used for training, and returns the model score plus separate domain and URL observations.
+### Features Analyzed by the System
 
-A small, explicitly limited rule recognizes the exact HTTPS homepage of selected well-known domains. This is not a general whitelist for their subpages. When a known domain's URL pattern conflicts with the model, the app can show a mixed-signal review result rather than implying that the destination is automatically safe.
+| Feature category | Examples |
+|---|---|
+| Domain structure | Hostname, registered domain, public suffix, subdomain depth |
+| Hostname characteristics | IP address indicators, punycode, suspicious words, character patterns |
+| Numerical URL features | URL length, special character counts, query parameter counts |
+| Path characteristics | Path depth, suspicious file extensions, character sequences |
+| Query characteristics | Query parameters, encoded characters, suspicious URL patterns |
+| Combined model features | Numerical features and sparse character n-gram representations |
 
-For more detail, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/DATASET_AND_EVALUATION.md`](docs/DATASET_AND_EVALUATION.md).
+The system also includes a limited rule for recognizing the exact HTTPS homepage of selected well known domains. This rule is not a general whitelist for their subpages or hosted content. Depending on the implementation's decision logic, conflicting model and domain signals may result in a review oriented verdict.
 
-## Project structure
+For a detailed explanation, see [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/DATASET_AND_EVALUATION.md`](docs/DATASET_AND_EVALUATION.md).
+
+## Project Structure
 
 ```text
-PhishingDetectionSystem_DomainAware/
-├── app.py                         # Flask API on 127.0.0.1:5000
-├── train_model.py                 # training and domain-disjoint evaluation
-├── model_pipeline.py              # shared feature-matrix creation
-├── url_features.py                # URL parsing and feature extraction
-├── public_suffix_list.dat          # offline public-suffix rules
-├── index.html                     # standalone web interface and user guide
-├── requirements.txt               # Python dependencies
-├── test_url_features.py           # URL and domain feature tests
-├── test_model_pipeline.py         # hybrid-pipeline test
-├── THIRD_PARTY_NOTICES.md         # third-party data attribution
-├── browser_extension/             # unpacked Manifest V3 browser extension
-├── docs/                           # setup, API, architecture, and evaluation docs
-├── phishing_dataset.csv           # local training data, excluded from Git by default
-└── phishing_model.pkl             # generated model, excluded from Git
+machine_learning_based_phishing_URL_detection_system_for_web_browser/
+├── app.py
+├── train_model.py
+├── model_pipeline.py
+├── url_features.py
+├── public_suffix_list.dat
+├── index.html
+├── requirements.txt
+├── test_url_features.py
+├── test_model_pipeline.py
+├── browser_extension/
+│   ├── manifest.json
+│   ├── popup.html
+│   ├── popup.css
+│   ├── popup.js
+│   ├── icons/
+│   └── README.md
+├── docs/
+│   ├── SETUP_WINDOWS.md
+│   ├── ARCHITECTURE.md
+│   ├── API.md
+│   ├── BROWSER_EXTENSION.md
+│   ├── DATASET_AND_EVALUATION.md
+│   ├── PRESENTATION_GUIDE.md
+│   └── PUBLISH_TO_GITHUB.md
+├── phishing_dataset.csv
+└── phishing_model.pkl
 ```
 
-The dataset and model file are deliberately ignored by Git in this repository template. See [Dataset and generated model](#dataset-and-generated-model) before pushing to a public repository.
+The dataset and trained model shown in the structure may be stored locally rather than included in the public repository. The dataset is needed for training, while the generated model is needed for prediction.
 
 ## Requirements
 
-- Windows 10 or 11 instructions are provided below.
-- Python 3.12 is the recommended environment for this project.
-- Google Chrome or Brave for the browser extension.
-- Git for publishing or versioning the source code.
-- The authorized training CSV is required only when training or retraining the model.
+- Windows 10 or Windows 11
+- Python 3.12
+- Google Chrome or Brave, if using the browser extension
+- Git, if cloning or updating the repository
+- An authorized training dataset, if training or retraining the model
 
-The browser extension does not require Node.js, npm, a frontend framework, or a separate web server. It does require the local Flask backend to be running.
+The browser extension does not require Node.js, npm, or a frontend framework. It does require the local Python backend to be running.
 
-## Windows setup
+## Installation and Setup
 
-### 1. Open PowerShell in the project folder
+### 1. Download the project
 
-Navigate into the folder containing `app.py`, `train_model.py`, and `requirements.txt`. Do not run these commands from `C:\Windows\System32` or a parent folder that does not contain the project.
+Clone the repository:
 
-### 2. Confirm Python
+```powershell
+git clone https://github.com/geoffabramvicera/machine_learning_based_phishing_URL_detection_system_for_web_browser.git
+```
+
+Enter the project folder:
+
+```powershell
+cd machine_learning_based_phishing_URL_detection_system_for_web_browser
+```
+
+Alternatively, download the repository as a ZIP file from GitHub and extract it.
+
+### 2. Verify Python
 
 ```powershell
 py -3.12 --version
 ```
 
+The command should display Python 3.12.x.
+
 ### 3. Create a virtual environment
+
+Run this command from the project root, the directory containing `app.py` and `requirements.txt`.
 
 ```powershell
 py -3.12 -m venv .venv
@@ -113,9 +180,11 @@ py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-### 5. Add the authorized dataset
+### 5. Prepare the dataset
 
-Training requires `phishing_dataset.csv` in the project root. Its required columns are:
+To train the model, place an authorized `phishing_dataset.csv` file in the project root.
+
+The CSV must contain the following columns:
 
 ```csv
 url,label
@@ -123,7 +192,9 @@ https://example.com,legitimate
 http://suspicious.example/path,phishing
 ```
 
-The accepted labels are `legitimate` and `phishing`. This repository does not currently document the original source or redistribution license for the supplied dataset, so the raw CSV is excluded from Git by default. Obtain the dataset from its original source and follow its license or redistribution terms. See [`docs/DATASET_AND_EVALUATION.md`](docs/DATASET_AND_EVALUATION.md).
+The accepted labels are `legitimate` and `phishing`. These example URLs illustrate the expected format and are not a recommended training dataset.
+
+Obtain training data from a source whose license and redistribution terms permit your intended use. If you already have a trained model compatible with the current code, you may be able to run the application without retraining.
 
 ### 6. Run the tests
 
@@ -131,59 +202,112 @@ The accepted labels are `legitimate` and `phishing`. This repository does not cu
 .\.venv\Scripts\python.exe -m unittest discover -v
 ```
 
-### 7. Train the model
+Review the output to determine whether the tests pass.
+
+### 7. Train the model, if necessary
 
 ```powershell
 .\.venv\Scripts\python.exe train_model.py
 ```
 
-Training may take several minutes, depending on hardware and dataset size. The script evaluates the classifier on held-out registered domains and saves `phishing_model.pkl` in the project root. Keep the terminal open until it reports that the model was saved.
+The script processes the dataset, trains and evaluates the classifier, and saves `phishing_model.pkl` in the project root.
 
-**Retrain this version before the first run.** It uses a hybrid character n-gram and numeric feature model. Do not reuse a model generated by an older version of the project.
+Training may take several minutes, depending on dataset size and computer performance. Wait for the script to finish before starting the backend.
 
-## Run the web interface
+Use a model generated by the current version of the feature extraction and training code. A model generated by an incompatible older version may not load or produce valid predictions.
 
-Open two PowerShell windows in the project root.
+## Running the System
 
-**Terminal 1, start the backend:**
+### 1. Start the backend
+
+Open PowerShell in the project root and run:
 
 ```powershell
 .\.venv\Scripts\python.exe app.py
 ```
 
-The API listens on `http://127.0.0.1:5000`. Check `http://127.0.0.1:5000/health` to see whether the model loaded successfully.
+Keep this terminal open while using the application.
 
-**Terminal 2, serve the frontend:**
+The local API is expected to be available at:
+
+`http://127.0.0.1:5000`
+
+Check its health endpoint:
+
+`http://127.0.0.1:5000/health`
+
+A successful response should indicate that the model loaded correctly.
+
+### 2. Open the web interface
+
+Open a second PowerShell window in the same project root and run:
 
 ```powershell
 py -3.12 -m http.server 8000
 ```
 
-Open `http://localhost:8000/index.html` in Chrome or Brave. The static web server must be started from the folder containing `index.html`.
+Open the following address in Chrome or Brave:
 
-For everyday use, the trained model does not need to be retrained again unless the dataset, feature extraction logic, or training configuration changes.
+`http://localhost:8000/index.html`
 
-## Install the browser extension
+The static web server must be started from the directory containing `index.html`.
 
-The extension is an unpacked Manifest V3 extension. It scans manually when the user opens the popup and clicks Analyze URL. It can use the active tab URL or a manually pasted URL.
+The web interface and backend use separate ports. Keep both terminals running when using the standalone web interface.
 
-1. Start the backend using the command in [Run the web interface](#run-the-web-interface), Terminal 1. The frontend server on port 8000 is **not** needed for the extension.
-2. Open `brave://extensions` in Brave or `chrome://extensions` in Chrome.
+### Everyday use
+
+Once a compatible trained model exists, the model does not need to be retrained every time the system starts. Retraining is necessary when the dataset, feature extraction logic, or training configuration changes.
+
+## Installing the Browser Extension
+
+The project includes an unpacked Manifest V3 extension for Google Chrome and Brave.
+
+### Installation steps
+
+1. Start the Python backend using the instructions above.
+2. Open `chrome://extensions` in Google Chrome or `brave://extensions` in Brave.
 3. Enable **Developer mode**.
-4. Select **Load unpacked**.
-5. Choose the repository's `browser_extension` directory, the one containing `manifest.json`.
-6. Pin PhishGuard from the browser's extensions menu.
-7. Open a normal website, click the PhishGuard icon, and analyze the current tab or paste another URL.
+4. Click **Load unpacked**.
+5. Select the project's `browser_extension` folder, which contains `manifest.json`.
+6. Pin the extension using the browser's extensions menu.
+7. Open the extension popup to begin analyzing URLs.
 
-The extension calls the API at `http://127.0.0.1:5000`. Keep the backend running while using it. For the complete extension guide, see [`docs/BROWSER_EXTENSION.md`](docs/BROWSER_EXTENSION.md) and [`browser_extension/README.md`](browser_extension/README.md).
+The extension communicates with the local backend at:
 
-## API reference
+`http://127.0.0.1:5000`
+
+The static web server on port 8000 is not required for the extension. The backend must remain running while the extension is in use.
+
+See [`docs/BROWSER_EXTENSION.md`](docs/BROWSER_EXTENSION.md) and [`browser_extension/README.md`](browser_extension/README.md) for additional instructions.
+
+## Using the System
+
+### Through the web interface
+
+1. Start the backend and web server.
+2. Open `http://localhost:8000/index.html`.
+3. Enter or paste a URL into the input field.
+4. Click the URL analysis button.
+5. Review the classification result, phishing score, and domain and URL observations.
+6. Treat suspicious results as warnings that require further investigation.
+
+### Through the browser extension
+
+1. Start the backend.
+2. Open a webpage or navigate to the URL you want to examine.
+3. Click the extension icon.
+4. Analyze the active tab URL or enter a URL manually, depending on the popup's available controls.
+5. Review the returned result.
+
+The extension is a manual checker. It does not automatically block navigation or replace the browser's built in security protections.
+
+## API Reference
 
 ### `GET /health`
 
-Reports whether the model is loaded.
+Checks whether the backend is running and whether the trained model is loaded.
 
-Example:
+Example response:
 
 ```json
 {
@@ -195,11 +319,13 @@ Example:
 }
 ```
 
-The exact model name and version are returned by the running backend. If the model is missing or outdated, the endpoint returns HTTP `503` and an error message.
+The exact model name and version depend on the running backend. If the model is missing or incompatible, the endpoint may report an error or return HTTP `503`.
 
 ### `POST /predict`
 
-Request body:
+Submits a URL for analysis.
+
+Example request:
 
 ```json
 {
@@ -207,78 +333,91 @@ Request body:
 }
 ```
 
-The response includes the normalized input URL, final verdict, raw model verdict, estimated phishing score, result explanation, domain analysis, URL structure analysis, and limitations. The main fields include:
+The response contains the prediction, estimated phishing score, and explanatory information. Main fields may include:
 
-- `is_phishing`: final application verdict after the narrow homepage/context rule.
-- `model_is_phishing`: raw classifier label before that rule.
-- `phishing_score`: model-estimated score for the phishing class, from 0 to 100.
-- `result_label`: user-facing verdict.
-- `domain_analysis`: hostname and registered-domain observations.
-- `url_analysis`: path, query, encoding, and URL-structure observations.
-- `explanation`: a plain-language explanation and caveat.
+- `is_phishing`: final application verdict after the configured decision rules.
+- `model_is_phishing`: raw classifier label before additional application rules.
+- `phishing_score`: estimated score for the phishing class, from 0 to 100.
+- `result_label`: user facing classification.
+- `domain_analysis`: observations about the hostname and registered domain.
+- `url_analysis`: observations about the path, query, encoding, and URL structure.
+- `explanation`: explanatory text and relevant caveats.
 
-`phishing_score` is not a guarantee and is not necessarily a calibrated probability of real-world maliciousness. A model score alone should not be interpreted as a verdict from a live threat database. See [`docs/API.md`](docs/API.md) for examples and error responses.
+The exact response fields depend on the implementation. See [`docs/API.md`](docs/API.md) for endpoint details, examples, and error responses.
 
-## Tests and model evaluation
+The phishing score is not necessarily a calibrated probability of real world maliciousness. It is a model estimate based on the trained classifier, not confirmation from a live threat intelligence database.
 
-Run all unit tests with:
+## Testing and Model Evaluation
+
+Run the unit tests with:
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -v
 ```
 
-The test suite checks domain parsing, public suffix handling, hostname and URL feature separation, URL validation, the narrow homepage recognition rule, and construction of the hybrid feature matrix.
+The tests cover URL feature extraction, domain parsing, URL validation, selected domain recognition behavior, and construction of the combined model feature matrix.
 
-During training, the script prints accuracy, precision, recall, F1 score, false positive rate, confusion matrix, and classification report for a held-out domain split. Treat those as results on this dataset and split, not proof of real-world performance. The full model must be trained locally to obtain the metrics for that run; do not copy unverified metrics into a presentation.
+During training, the script reports classification metrics such as:
 
-## Dataset and generated model
+- Accuracy
+- Precision
+- Recall
+- F1 score
+- False positive rate
+- Confusion matrix
+- Classification report
 
-`phishing_dataset.csv` is needed for training and must have `url` and `label` columns. The source and redistribution terms for the CSV supplied with the original project have not been established in this repository. For that reason:
+The evaluation uses a held out domain split to help reduce leakage between training and testing examples from the same registered domain.
 
-- `phishing_dataset.csv` is ignored by `.gitignore` and is not intended to be pushed to a public GitHub repository until its source and license have been verified.
-- `phishing_model.pkl` is generated locally and ignored by Git. Recreate it by running `train_model.py` after obtaining the authorized dataset.
-- A person cloning this repository must obtain an authorized dataset and place it at the project root before they can train the model.
-- Do not force-add the CSV merely to make the repository look complete. First verify the dataset's source, terms, and any required attribution.
+These metrics describe performance on the dataset and evaluation split used for that training run. They do not establish guaranteed performance on previously unseen real world phishing attacks.
 
-If you have confirmed the dataset can be redistributed, you may remove the dataset entry from `.gitignore`, document the origin and license in the README, and add the file to the repository. GitHub enforces a 100 MB limit for an individual Git file, but license and provenance should be checked before size is considered. See GitHub's [repository limits](https://docs.github.com/en/repositories/creating-and-managing-repositories/repository-limits).
+Do not report unverified performance values in project documentation or presentations. Use the actual output from your training run.
 
-## Limitations and responsible use
+## Dataset and Model Training
 
-- URL and domain text can indicate suspicious patterns, but attackers can use clean-looking domains and URLs.
-- The model is only as reliable as the labels, coverage, recency, and distribution of its training data.
-- The application does not query DNS, inspect certificate history, retrieve domain registration dates, follow redirects, inspect HTML/JavaScript, or perform a live malware scan.
-- It does not automatically block or prevent navigation. The extension is a manual checker.
-- Recognizing a well-known root homepage does not make its subpages or user-hosted content safe.
-- The score is a model estimate, not a confirmed real-world probability.
-- Do not enter secrets, passwords, session tokens, or private internal URLs into a public demo.
+The training dataset must contain `url` and `label` columns. The training script extracts URL features, builds the combined feature representation, trains the classifier, and evaluates it.
 
-Use additional trusted security controls and threat intelligence for real-world protection. Do not rely on this prototype as the only security measure.
+The generated `phishing_model.pkl` file stores the trained pipeline used by the backend.
 
-## Attribution and licensing
+If the dataset is not distributed with the repository, users must obtain an authorized copy and place it in the project root before training. If the model file is also absent, training must be completed before predictions can be made.
 
-The bundled `public_suffix_list.dat` is a snapshot of the Public Suffix List. Its source and licensing details are documented in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). This snapshot may become stale and should be refreshed from the upstream project when appropriate.
+Before publishing a dataset or a generated model, verify the source, license, redistribution conditions, and any applicable attribution requirements.
 
-No root-level license has been selected for this project's original code. Before presenting the repository as open source, select a license for the code you are authorized to license and separately verify the data and third-party notices. A public GitHub repository does not automatically grant broad reuse rights; see [GitHub's licensing guidance](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/licensing-a-repository).
+## Limitations
+
+- URL and domain text can reveal suspicious patterns, but phishing URLs can also look legitimate.
+- Model reliability depends on the quality, coverage, freshness, and labeling accuracy of the training dataset.
+- The system does not automatically query DNS, inspect certificate history, retrieve domain registration dates, follow redirects, inspect webpage HTML or JavaScript, or perform a live malware scan.
+- It does not automatically block malicious destinations.
+- A recognized domain homepage does not make every subpage or user hosted resource safe.
+- The phishing score is an estimate, not a confirmed real world probability.
+- The system may produce false positives and false negatives.
+- The public suffix list snapshot can become outdated and may require maintenance.
+
+Use the system as an additional URL analysis tool rather than as the sole means of cybersecurity protection.
 
 ## Troubleshooting
 
-| Issue | What to check |
+| Problem | Suggested solution |
 |---|---|
-| `requirements.txt` not found | Navigate to the directory containing the project files before running pip. |
-| `train_model.py` not found | Make sure PowerShell is in the project root. Use `dir` to check. |
-| Dataset not found | Obtain the authorized CSV and place `phishing_dataset.csv` in the project root. |
-| `phishing_model.pkl` missing | Run `train_model.py` and wait for training to complete. |
-| Old or incompatible model | Retrain with the current code, then restart `app.py`. |
-| Website returns 404 | Start `http.server` from the folder containing `index.html`. |
-| Extension cannot connect | Keep `app.py` running and confirm `http://127.0.0.1:5000/health` reports `model_loaded: true`. |
-| Port 5000 or 8000 is occupied | Stop the other process using that port, or adjust the API and extension configuration consistently. |
-| False positive or false negative | Review the domain and URL indicators, inspect data labels, and evaluate on new domains rather than adding broad allowlists. |
+| `requirements.txt` not found | Navigate to the project root before installing dependencies. |
+| `train_model.py` not found | Confirm that PowerShell is in the folder containing the training script. |
+| Dataset not found | Place an authorized `phishing_dataset.csv` in the project root before training. |
+| `phishing_model.pkl` missing | Train the model and wait for the process to finish. |
+| Model fails to load | Retrain using the current code and restart the backend. |
+| Web interface returns 404 | Start the static server from the folder containing `index.html`. |
+| Extension cannot connect | Keep the backend running and check `http://127.0.0.1:5000/health`. |
+| Port 5000 or 8000 is occupied | Stop the conflicting process or update the relevant configuration consistently. |
+| A legitimate URL is flagged | Review the domain and URL findings and evaluate the model against additional labeled examples. |
+| A phishing URL is marked safe | Treat the result cautiously and use additional trusted security tools. |
 
-## Further documentation
+## Additional Documentation
 
-- [Windows setup and runbook](docs/SETUP_WINDOWS.md)
-- [Publish to GitHub](docs/PUBLISH_TO_GITHUB.md)
-- [System architecture and model overview](docs/ARCHITECTURE.md)
-- [API reference and sample responses](docs/API.md)
-- [Browser extension installation](docs/BROWSER_EXTENSION.md)
-- [Dataset, evaluation, and reproducibility](docs/DATASET_AND_EVALUATION.md)
+- [Windows Setup Guide](docs/SETUP_WINDOWS.md)
+- [System Architecture](docs/ARCHITECTURE.md)
+- [API Documentation](docs/API.md)
+- [Browser Extension Guide](docs/BROWSER_EXTENSION.md)
+- [Dataset and Model Evaluation](docs/DATASET_AND_EVALUATION.md)
+- [Presentation Guide](docs/PRESENTATION_GUIDE.md)
+- [GitHub Publishing Guide](docs/PUBLISH_TO_GITHUB.md)
+- [Browser Extension README](browser_extension/README.md)
