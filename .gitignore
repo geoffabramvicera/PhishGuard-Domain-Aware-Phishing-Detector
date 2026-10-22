@@ -1,0 +1,34 @@
+# Python environments
+.venv/
+venv/
+env/
+
+# Python cache and test/build artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+
+# Generated model artifact, retrain locally
+phishing_model.pkl
+
+# Training data, do not publish until source and redistribution rights are verified
+phishing_dataset.csv
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PhishGuard</title>
+  <link rel="stylesheet" href="popup.css">
+  <script src="popup.js" defer></script>
+</head>
+<body>
+  <main class="app-shell">
+    <header class="topbar">
+      <div class="brand-icon" aria-hidden="true">
+        <svg viewBox="0 0 32 32" role="img">
+          <path d="M16 3.4 26 7v7.2c0 6.4-4.2 11.4-10 14.2C10.2 25.6 6 20.6 6 14.2V7Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/>
+          <path d="m11.2 15.6 3.1 3.2 6.8-7.1" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="brand-copy">
+        <h1>PhishGuard</h1>
+        <p>Domain aware URL checker</p>
+      </div>
+      <span class="local-tag">LOCAL MODEL</span>
+    </header>
+
+    <section class="connection-row" aria-live="polite">
+      <span id="connection-dot" class="connection-dot"></span>
+      <span id="connection-text">Checking local model...</span>
+      <button id="retry-health" class="text-button" type="button" title="Check backend connection again">Retry</button>
+    </section>
+
+    <section class="scan-section">
+      <label for="url-input" class="field-label">Website URL</label>
+      <textarea id="url-input" rows="2" maxlength="2048" spellcheck="false" autocomplete="off" placeholder="https://example.com" aria-describedby="url-help"></textarea>
+      <p id="url-help" class="field-help">The URL is sent to the Python model running on this computer. It is not sent to a public scanning service by this extension.</p>
+      <div class="button-row">
+        <button id="current-tab-btn" class="button button-secondary" type="button">Use current tab</button>
+        <button id="scan-btn" class="button button-primary" type="button">Analyze URL</button>
+      </div>
+      <p id="status-message" class="status-message" role="status" aria-live="polite"></p>
+    </section>
+
+    <section id="result-panel" class="result-panel hidden" aria-live="polite">
+      <div class="verdict-head">
+        <div id="verdict-icon" class="verdict-icon" aria-hidden="true">?</div>
+        <div class="verdict-copy">
+          <p id="verdict-eyebrow" class="eyebrow">ANALYSIS RESULT</p>
+          <h2 id="verdict-title">Result</h2>
+        </div>
+      </div>
+      <p id="result-explanation" class="result-explanation"></p>
+
+      <div class="score-card">
+        <div class="score-label-row">
+          <span>Estimated phishing score</span>
+          <strong id="phishing-score">Not available</strong>
+        </div>
+        <div class="score-track" role="progressbar" aria-label="Estimated phishing score" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="score-progress">
+          <div id="score-fill" class="score-fill"></div>
+        </div>
+        <p class="score-note">This is a model estimate, not a verified probability or proof that the site is safe or malicious.</p>
+        <p id="raw-model-note" class="raw-model-note hidden"></p>
+      </div>
+
+      <details class="analysis-details" open>
+        <summary>Domain analysis</summary>
+        <dl class="facts-list">
+          <div><dt>Hostname</dt><dd id="hostname-value">Not available</dd></div>
+          <div><dt>Registered domain</dt><dd id="registered-domain-value">Not available</dd></div>
+          <div><dt>Public suffix</dt><dd id="public-suffix-value">Not available</dd></div>
+          <div><dt>Subdomain levels</dt><dd id="subdomain-count-value">Not available</dd></div>
+        </dl>
+        <ul id="domain-indicators" class="indicator-list"></ul>
+      </details>
+
+      <details class="analysis-details">
+        <summary>URL structure analysis</summary>
+        <dl class="facts-list">
+          <div><dt>Path depth</dt><dd id="path-depth-value">Not available</dd></div>
+          <div><dt>Query parameters</dt><dd id="query-count-value">Not available</dd></div>
+        </dl>
+        <ul id="url-indicators" class="indicator-list"></ul>
+      </details>
+    </section>
+
+    <section id="empty-panel" class="empty-panel">
+      <div class="empty-icon" aria-hidden="true">↗</div>
+      <h2>Ready to check a link?</h2>
+      <p>Open a website and click the PhishGuard toolbar icon, or paste a URL above. Select Analyze URL to request a prediction from your local model.</p>
+    </section>
+
+    <footer class="footer-note">
+      <strong>Prototype limitation</strong>
+      <p>PhishGuard analyzes URL and domain patterns. It does not inspect the page, verify domain ownership, or check live threat reputation. A low score does not guarantee safety.</p>
+    </footer>
+  </main>
+</body>
+</html>

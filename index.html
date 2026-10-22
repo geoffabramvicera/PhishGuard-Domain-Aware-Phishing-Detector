@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#101d33">
+  <meta name="description" content="A local educational phishing URL detector using domain character patterns and URL structure features.">
+  <title>PhishGuard | Phishing URL Detector</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #15243a;
+      --muted: #63728a;
+      --muted-light: #8a97aa;
+      --line: #e3e9f1;
+      --surface: #ffffff;
+      --page: #f4f7fb;
+      --navy: #101d33;
+      --blue: #246bce;
+      --blue-dark: #1755aa;
+      --blue-pale: #eaf3ff;
+      --green: #13784d;
+      --green-pale: #eaf8f0;
+      --red: #b42335;
+      --red-pale: #fff0f1;
+      --amber: #99620b;
+      --amber-pale: #fff7e5;
+      --shadow: 0 16px 46px rgba(24, 44, 74, 0.08);
+      --radius: 20px;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 88px; }
+    body {
+      margin: 0;
+      background: var(--page);
+      color: var(--ink);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+    button, input { font: inherit; }
+    button, a, input { -webkit-tap-highlight-color: transparent; }
+    a { color: inherit; }
+    button:focus-visible, a:focus-visible, input:focus-visible {
+      outline: 3px solid #83b7ff;
+      outline-offset: 3px;
+    }
+    .container { width: min(1120px, calc(100% - 40px)); margin: 0 auto; }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      color: #fff;
+      background: rgba(16, 29, 51, 0.97);
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      backdrop-filter: blur(14px);
+    }
+    .nav-row { min-height: 74px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+    .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; min-width: 215px; }
+    .brand-mark { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; color: #c4e4ff; background: rgba(90, 160, 255, .16); border: 1px solid rgba(151, 199, 255, .2); }
+    .brand-name { font-size: 18px; font-weight: 780; letter-spacing: -0.45px; line-height: 1.2; }
+    .brand-sub { color: #b6c5d9; font-size: 11px; margin-top: 4px; }
+    .nav-links { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: 22px; }
+    .nav-links a { text-decoration: none; color: #d2ddec; font-size: 13px; font-weight: 600; transition: color .15s ease; }
+    .nav-links a:hover { color: #fff; }
+
+    .hero {
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      color: white;
+      padding: 64px 0 104px;
+      background: radial-gradient(circle at 85% 15%, rgba(39, 119, 220, .36), transparent 34%), linear-gradient(120deg, #101d33, #162b49 74%, #193a65);
+    }
+    .hero::after { content: ""; position: absolute; z-index: -1; width: 470px; height: 470px; border: 1px solid rgba(199, 224, 255, .1); border-radius: 50%; right: -120px; top: -230px; box-shadow: 0 0 0 42px rgba(199,224,255,.025), 0 0 0 84px rgba(199,224,255,.025); }
+    .hero-grid { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(250px, .8fr); align-items: center; gap: 48px; }
+    .eyebrow { display: inline-flex; align-items: center; gap: 8px; padding: 7px 11px; border: 1px solid rgba(176, 214, 255, .23); border-radius: 999px; background: rgba(151, 199, 255, .09); color: #cfe7ff; font-size: 12px; font-weight: 700; letter-spacing: .02em; }
+    .eyebrow-dot { width: 7px; height: 7px; border-radius: 50%; background: #62d6a4; box-shadow: 0 0 0 4px rgba(98,214,164,.12); }
+    h1 { max-width: 730px; margin: 20px 0 16px; font-size: clamp(34px, 4.5vw, 55px); line-height: 1.08; letter-spacing: -1.9px; }
+    .hero-copy { max-width: 660px; margin: 0; color: #c6d3e4; font-size: 16px; }
+    .hero-notes { display: flex; flex-wrap: wrap; gap: 10px 18px; margin-top: 26px; color: #d9e7f7; font-size: 12px; }
+    .hero-notes span { display: inline-flex; gap: 7px; align-items: center; }
+    .hero-aside { padding: 24px; background: rgba(255,255,255,.075); border: 1px solid rgba(255,255,255,.13); border-radius: 22px; box-shadow: 0 20px 55px rgba(0,0,0,.12); }
+    .aside-symbol { width: 52px; height: 52px; display: grid; place-items: center; border-radius: 16px; color: #bce3ff; background: rgba(83,155,239,.16); margin-bottom: 19px; }
+    .hero-aside h2 { margin: 0 0 8px; font-size: 17px; letter-spacing: -.3px; }
+    .hero-aside p { margin: 0; color: #c7d4e4; font-size: 13px; }
+    .aside-separator { height: 1px; background: rgba(255,255,255,.14); margin: 18px 0; }
+    .aside-meta { display: flex; justify-content: space-between; gap: 16px; font-size: 12px; }
+    .aside-meta span:first-child { color: #c5d3e4; }
+    .aside-meta strong { color: #fff; font-weight: 650; }
+
+    main { position: relative; margin-top: -52px; padding-bottom: 70px; }
+    .analyzer-card, .content-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .analyzer-card { position: relative; z-index: 1; padding: 30px; }
+    .section-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; }
+    .section-heading h2 { margin: 0; font-size: 22px; letter-spacing: -.65px; }
+    .section-heading p { margin: 7px 0 0; color: var(--muted); font-size: 13px; }
+    .api-status { display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0; padding: 7px 10px; border: 1px solid var(--line); border-radius: 999px; background: #f9fbfe; color: var(--muted); font-size: 11px; font-weight: 750; }
+    .api-status .status-dot { width: 7px; height: 7px; border-radius: 100%; background: #a5b0bf; }
+    .api-status.online { color: var(--green); background: #f0faf4; border-color: #cfeedd; }
+    .api-status.online .status-dot { background: #23a26d; }
+    .api-status.warning { color: var(--amber); background: var(--amber-pale); border-color: #f0dfb6; }
+    .api-status.warning .status-dot { background: #d18a12; }
+    .api-status.offline { color: var(--red); background: var(--red-pale); border-color: #f2cdd2; }
+    .api-status.offline .status-dot { background: #d04455; }
+
+    .analyzer-form { margin-top: 26px; }
+    .field-label { display: block; margin-bottom: 9px; font-size: 13px; font-weight: 750; }
+    .input-row { display: flex; gap: 10px; }
+    .url-input-wrap { position: relative; flex: 1; min-width: 0; }
+    .url-input-icon { position: absolute; left: 15px; top: 50%; transform: translateY(-50%); color: #8b9ab0; pointer-events: none; }
+    .url-input { width: 100%; min-height: 54px; padding: 13px 15px 13px 45px; border: 1px solid #d7e0eb; border-radius: 12px; background: #fbfcfe; color: var(--ink); transition: box-shadow .15s, border-color .15s; }
+    .url-input::placeholder { color: #9aa7b8; }
+    .url-input:focus { outline: none; border-color: #6ea6ed; box-shadow: 0 0 0 4px rgba(36,107,206,.11); background: white; }
+    .url-input[aria-invalid="true"] { border-color: #d04455; box-shadow: 0 0 0 3px rgba(208,68,85,.08); }
+    .primary-button { min-height: 54px; display: inline-flex; justify-content: center; align-items: center; gap: 9px; padding: 0 21px; border: 1px solid var(--blue); border-radius: 12px; background: var(--blue); color: white; cursor: pointer; font-weight: 750; font-size: 13px; white-space: nowrap; transition: background .15s ease, transform .15s ease; }
+    .primary-button:hover:not(:disabled) { background: var(--blue-dark); transform: translateY(-1px); }
+    .primary-button:disabled { opacity: .7; cursor: wait; }
+    .button-spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,.45); border-top-color: white; border-radius: 50%; display: none; animation: spin .75s linear infinite; }
+    .primary-button.loading .button-spinner { display: inline-block; }
+    .form-hint { margin: 10px 0 0; color: var(--muted); font-size: 12px; }
+    .field-error { min-height: 0; margin: 8px 0 0; color: var(--red); font-size: 12px; }
+    .examples { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+    .examples-label { margin-right: 2px; color: var(--muted); font-size: 11px; font-weight: 750; }
+    .example-chip { border: 1px solid #dce5f0; border-radius: 999px; background: white; color: #445772; padding: 6px 10px; cursor: pointer; font-size: 11px; font-weight: 650; }
+    .example-chip:hover { border-color: #a8c7ef; color: var(--blue-dark); background: #f7fbff; }
+
+    .result-card { margin-top: 24px; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+    .result-card[hidden] { display: none; }
+    .result-top { padding: 20px 22px; display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; }
+    .result-main { display: flex; align-items: flex-start; gap: 13px; min-width: 0; }
+    .result-icon { flex-shrink: 0; width: 42px; height: 42px; display: grid; place-items: center; border-radius: 13px; }
+    .result-card.result-phishing .result-icon { background: #ffe0e3; color: var(--red); }
+    .result-card.result-legitimate .result-icon { background: #d8f5e5; color: var(--green); }
+    .result-title { margin: 0; font-size: 17px; letter-spacing: -.25px; }
+    .result-copy { margin: 4px 0 0; color: var(--muted); font-size: 12px; }
+    .result-badge { flex-shrink: 0; border-radius: 999px; padding: 6px 9px; font-size: 10px; font-weight: 800; letter-spacing: .035em; text-transform: uppercase; }
+    .result-card.result-phishing { background: linear-gradient(180deg, #fffafa, #fff); border-color: #f0cdd2; }
+    .result-card.result-legitimate { background: linear-gradient(180deg, #f5fcf7, #fff); border-color: #cfe9d9; }
+    .result-card.result-phishing .result-badge { color: var(--red); background: #ffe8ea; }
+    .result-card.result-legitimate .result-badge { color: var(--green); background: #e0f6e9; }
+    .result-card.result-review { background: linear-gradient(180deg, #fffaf0, #fff); border-color: #ead6a7; }
+    .result-card.result-review .result-icon { background: #fff0c2; color: #895d0a; }
+    .result-card.result-review .result-badge { color: #80580b; background: #fff0c2; }
+    .result-card.result-review .score-fill { background: linear-gradient(90deg, #efc76b, #d28a1a); }
+    .result-body { padding: 0 22px 22px; }
+    .submitted-url { overflow-wrap: anywhere; border: 1px solid #e5eaf0; background: #f7f9fc; border-radius: 10px; padding: 11px 12px; color: #465772; font-size: 12px; }
+    .score-area { margin-top: 20px; }
+    .score-label-row { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; }
+    .score-label { font-size: 12px; font-weight: 750; }
+    .score-value { font-size: 24px; font-weight: 820; letter-spacing: -.7px; font-variant-numeric: tabular-nums; }
+    .score-track { overflow: hidden; height: 8px; margin-top: 10px; background: #e8edf3; border-radius: 100px; }
+    .score-fill { height: 100%; width: 0; border-radius: inherit; transition: width .45s ease; }
+    .result-card.result-phishing .score-fill { background: linear-gradient(90deg, #ee9a55, #ce3447); }
+    .result-card.result-legitimate .score-fill { background: linear-gradient(90deg, #8ad9af, #1f9b65); }
+    .score-explainer { margin: 8px 0 0; color: var(--muted); font-size: 11px; }
+    .analysis-breakdown { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+    .analysis-block { min-width: 0; padding: 14px; border: 1px solid #e5eaf1; border-radius: 12px; background: #fbfcfe; }
+    .analysis-block h4 { margin: 0 0 8px; font-size: 12px; }
+    .analysis-identity { margin: 0 0 8px; color: #34465e; font-size: 11px; overflow-wrap: anywhere; }
+    .indicator-list { margin: 0; padding-left: 16px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .indicator-list li + li { margin-top: 4px; }
+    .feature-heading { margin: 23px 0 10px; font-size: 12px; font-weight: 800; }
+    .feature-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; }
+    .feature-item { min-width: 0; padding: 10px; border: 1px solid #e5eaf1; border-radius: 10px; background: white; }
+    .feature-label { display: block; color: var(--muted); font-size: 10px; line-height: 1.35; }
+    .feature-value { display: block; margin-top: 4px; font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+    .risk-reminder { display: flex; gap: 9px; align-items: flex-start; margin-top: 18px; padding: 12px 13px; border: 1px solid #f0dfb6; border-radius: 11px; background: var(--amber-pale); color: #72501a; font-size: 11px; }
+    .risk-reminder strong { color: #63430e; }
+
+    .content-section { margin-top: 40px; }
+    .section-intro { max-width: 690px; margin-bottom: 20px; }
+    .section-kicker { color: var(--blue); font-size: 11px; font-weight: 850; letter-spacing: .13em; text-transform: uppercase; }
+    .section-intro h2 { margin: 8px 0 7px; font-size: clamp(24px, 3vw, 31px); line-height: 1.2; letter-spacing: -.9px; }
+    .section-intro p { margin: 0; color: var(--muted); font-size: 14px; }
+    .steps-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .step-card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 21px; box-shadow: 0 8px 26px rgba(24,44,74,.035); }
+    .step-number { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: var(--blue-pale); color: var(--blue-dark); font-size: 13px; font-weight: 850; }
+    .step-card h3 { margin: 15px 0 7px; font-size: 15px; letter-spacing: -.2px; }
+    .step-card p { margin: 0; color: var(--muted); font-size: 12px; }
+    code, .code-line { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .step-card code, .guide-block code { color: #25476f; background: #f0f5fb; border: 1px solid #e3ebf5; border-radius: 5px; padding: 2px 5px; font-size: 11px; overflow-wrap: anywhere; }
+
+    .guide-grid { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, .95fr); gap: 16px; align-items: stretch; }
+    .content-card { padding: 24px; box-shadow: 0 8px 26px rgba(24,44,74,.035); }
+    .content-card h3 { margin: 0; font-size: 17px; letter-spacing: -.35px; }
+    .card-description { margin: 7px 0 18px; color: var(--muted); font-size: 12px; }
+    .command-group { padding: 14px 0; border-top: 1px solid #edf0f5; }
+    .command-group:first-of-type { border-top: 0; padding-top: 0; }
+    .command-title { margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; gap: 12px; font-size: 12px; font-weight: 800; }
+    .terminal-label { color: var(--muted-light); font-size: 10px; font-weight: 700; }
+    .code-block { display: flex; align-items: center; gap: 8px; padding: 10px; border: 1px solid #e5eaf1; border-radius: 9px; background: #f8fafc; }
+    .code-block code { flex: 1; min-width: 0; background: none; border: 0; padding: 0; color: #31435b; overflow-wrap: anywhere; font-size: 11px; }
+    .copy-button { flex-shrink: 0; border: 1px solid #dbe4ee; border-radius: 7px; padding: 5px 8px; background: #fff; color: #4b5f7a; cursor: pointer; font-size: 10px; font-weight: 750; }
+    .copy-button:hover { background: #eff6ff; border-color: #bad2f1; }
+    .guide-note { display: flex; gap: 9px; padding: 12px; margin-top: 15px; border-radius: 10px; background: var(--blue-pale); color: #31547d; font-size: 11px; }
+    .workflow { display: flex; flex-direction: column; gap: 0; }
+    .workflow-item { display: grid; grid-template-columns: 34px 1fr; gap: 12px; padding: 15px 0; border-top: 1px solid #edf0f5; }
+    .workflow-item:first-child { border-top: 0; padding-top: 0; }
+    .workflow-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: #f0f5fb; color: #476994; }
+    .workflow-item h4 { margin: 0 0 4px; font-size: 13px; }
+    .workflow-item p { margin: 0; color: var(--muted); font-size: 11px; }
+
+    .feature-explainer { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+    .feature-explainer-item { display: flex; gap: 11px; padding: 14px; background: #fff; border: 1px solid var(--line); border-radius: 12px; }
+    .feature-mini-icon { flex-shrink: 0; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 9px; background: #f0f5fb; color: #45678f; font-weight: 800; font-size: 11px; }
+    .feature-explainer-item strong { display: block; margin: 0 0 3px; font-size: 12px; }
+    .feature-explainer-item span { display: block; color: var(--muted); font-size: 11px; }
+
+    .limitations { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+    .limit-panel { padding: 23px; border-radius: 16px; border: 1px solid var(--line); background: white; }
+    .limit-panel h3 { margin: 0 0 12px; font-size: 15px; }
+    .limit-panel ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 12px; }
+    .limit-panel li + li { margin-top: 8px; }
+    .limit-panel.warning { background: #fffaf0; border-color: #f0e0bc; }
+    .limit-panel.warning h3 { color: #7b5416; }
+
+    .footer { padding: 25px 0 36px; border-top: 1px solid #e5ebf3; color: var(--muted); }
+    .footer-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+    .footer strong { color: #3b4b61; font-size: 12px; }
+    .footer p { max-width: 710px; margin: 6px 0 0; font-size: 11px; }
+    .footer a { color: var(--blue-dark); text-decoration: none; font-size: 11px; font-weight: 750; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    .toast { position: fixed; z-index: 25; bottom: 20px; left: 50%; transform: translate(-50%, 12px); opacity: 0; pointer-events: none; padding: 10px 14px; color: white; background: #172a45; border-radius: 10px; box-shadow: var(--shadow); font-size: 12px; transition: opacity .2s, transform .2s; }
+    .toast.visible { opacity: 1; transform: translate(-50%, 0); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    @media (max-width: 850px) {
+      .hero-grid { grid-template-columns: minmax(0, 1.2fr) minmax(220px, .8fr); gap: 25px; }
+      .nav-links { gap: 13px; }
+      .steps-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .feature-grid { grid-template-columns: repeat(5, minmax(0,1fr)); }
+    }
+    @media (max-width: 650px) {
+      .container { width: min(100% - 28px, 560px); }
+      .nav-row { min-height: 66px; }
+      .brand { min-width: 0; }
+      .brand-sub { display: none; }
+      .nav-links { gap: 12px; }
+      .nav-links a { font-size: 11px; }
+      .nav-links a:nth-child(4) { display: none; }
+      .hero { padding: 44px 0 82px; }
+      .hero-grid { display: block; }
+      .hero-aside { display: none; }
+      h1 { letter-spacing: -1.2px; }
+      .hero-copy { font-size: 14px; }
+      main { margin-top: -40px; }
+      .analyzer-card { padding: 21px 17px; }
+      .section-heading { display: block; }
+      .api-status { margin-top: 14px; }
+      .input-row { display: grid; grid-template-columns: 1fr; }
+      .primary-button { width: 100%; }
+      .result-top { padding: 17px; }
+      .result-body { padding: 0 17px 18px; }
+      .result-top { gap: 10px; }
+      .result-badge { font-size: 9px; }
+      .feature-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .analysis-breakdown { grid-template-columns: 1fr; }
+      .steps-grid, .guide-grid, .limitations { grid-template-columns: 1fr; }
+      .step-card { padding: 18px; }
+      .feature-explainer { grid-template-columns: 1fr; }
+      .content-card { padding: 20px; }
+      .footer-row { display: block; }
+      .footer a { display: inline-block; margin-top: 10px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="container nav-row">
+      <a class="brand" href="#top" aria-label="PhishGuard home">
+        <span class="brand-mark" aria-hidden="true">
+          <svg width="25" height="25" viewBox="0 0 24 24" fill="none"><path d="M12 2.8 19 5.6v5.7c0 4.5-2.8 7.9-7 9.9-4.2-2-7-5.4-7-9.9V5.6l7-2.8Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="m8.7 12 2.1 2.1 4.7-4.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span><span class="brand-name">PhishGuard</span><span class="brand-sub">Machine learning URL analysis</span></span>
+      </a>
+      <nav class="nav-links" aria-label="Main navigation">
+        <a href="#analyzer">Analyzer</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="#user-guide">User guide</a>
+        <a href="#limitations">Limitations</a>
+      </nav>
+    </div>
+  </header>
+
+  <section class="hero" id="top">
+    <div class="container hero-grid">
+      <div>
+        <div class="eyebrow"><span class="eyebrow-dot"></span> Local machine learning prototype</div>
+        <h1>Pause before you trust a link.</h1>
+        <p class="hero-copy">Analyze the actual hostname and registered domain, then combine domain character patterns with URL structure and path indicators. The model is trained locally and does not send submitted URLs to an external reputation service.</p>
+        <div class="hero-notes">
+          <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="m5 12 4 4L19 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> No paid API required</span>
+          <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3v18M3 12h18" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg> Host-aware URL features</span>
+          <span><svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3 4 6v5c0 5 3 8 8 10 5-2 8-5 8-10V6l-8-3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg> Runs locally</span>
+        </div>
+      </div>
+      <aside class="hero-aside" aria-label="About the model">
+        <div class="aside-symbol" aria-hidden="true"><svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M12 3 3.5 7.5v5c0 4.3 3.2 7 8.5 8.5 5.3-1.5 8.5-4.2 8.5-8.5v-5L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 12h8M12 8v8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+        <h2>A structural URL check</h2>
+        <p>The model reads the registered domain and hostname character patterns, then combines them with path, query, encoding, and character statistics. It does not open the website or verify live reputation.</p>
+        <div class="aside-separator"></div>
+        <div class="aside-meta"><span>Model</span><strong>Hybrid linear classifier</strong></div>
+        <div class="aside-meta" style="margin-top:10px"><span>Analysis method</span><strong>Domain n-grams + URL features</strong></div>
+      </aside>
+    </div>
+  </section>
+
+  <main class="container">
+    <section class="analyzer-card" id="analyzer" aria-labelledby="analyzer-heading">
+      <div class="section-heading">
+        <div>
+          <h2 id="analyzer-heading">Analyze a URL</h2>
+          <p>Paste the complete address. The app will submit it to your local Python model.</p>
+        </div>
+        <div class="api-status" id="apiStatus" role="status" aria-live="polite"><span class="status-dot"></span><span id="apiStatusText">Checking backend</span></div>
+      </div>
+
+      <form class="analyzer-form" id="urlForm" novalidate>
+        <label class="field-label" for="urlInput">Website URL</label>
+        <div class="input-row">
+          <div class="url-input-wrap">
+            <span class="url-input-icon" aria-hidden="true"><svg width="19" height="19" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.6"/><path d="M3.5 12h17M12 3c2.2 2.4 3.2 5.4 3.2 9s-1 6.6-3.2 9c-2.2-2.4-3.2-5.4-3.2-9S9.8 5.4 12 3Z" stroke="currentColor" stroke-width="1.5"/></svg></span>
+            <input class="url-input" id="urlInput" name="url" type="url" placeholder="https://example.com" autocomplete="url" autocapitalize="none" spellcheck="false" required aria-describedby="formHint fieldError">
+          </div>
+          <button class="primary-button" id="analyzeButton" type="submit"><span class="button-spinner" aria-hidden="true"></span><svg class="button-icon" width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4.5 4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span id="analyzeButtonText">Analyze URL</span></button>
+        </div>
+        <p class="form-hint" id="formHint">Include <code>http://</code> or <code>https://</code>. The app will not open the URL you submit.</p>
+        <p class="field-error" id="fieldError" role="alert"></p>
+      </form>
+
+      <div class="examples" aria-label="Example URLs">
+        <span class="examples-label">TRY AN EXAMPLE</span>
+        <button class="example-chip" type="button" data-example="https://www.google.com">https://www.google.com</button>
+        <button class="example-chip" type="button" data-example="https://github.com">https://github.com</button>
+        <button class="example-chip" type="button" data-example="http://192.168.1.1/login">IPv4 example</button>
+      </div>
+
+      <section class="result-card" id="resultCard" aria-live="polite" aria-atomic="false" hidden>
+        <div class="result-top">
+          <div class="result-main">
+            <div class="result-icon" id="resultIcon" aria-hidden="true"></div>
+            <div>
+              <h3 class="result-title" id="resultTitle">Analysis result</h3>
+              <p class="result-copy" id="resultCopy"></p>
+            </div>
+          </div>
+          <span class="result-badge" id="resultBadge">Model output</span>
+        </div>
+        <div class="result-body">
+          <div class="submitted-url" id="submittedUrl"></div>
+          <div class="analysis-breakdown" aria-label="Separate domain and URL analysis">
+            <section class="analysis-block">
+              <h4>Domain name check</h4>
+              <p class="analysis-identity" id="domainIdentity">Domain information will appear here.</p>
+              <ul class="indicator-list" id="domainIndicators"></ul>
+            </section>
+            <section class="analysis-block">
+              <h4>URL character and path check</h4>
+              <p class="analysis-identity" id="urlIdentity">Path and query findings will appear here.</p>
+              <ul class="indicator-list" id="urlIndicators"></ul>
+            </section>
+          </div>
+          <div class="score-area">
+            <div class="score-label-row"><span class="score-label" id="scoreLabel">Estimated phishing score</span><strong class="score-value" id="scoreValue">0%</strong></div>
+            <div class="score-track" id="scoreTrack" role="progressbar" aria-label="Estimated phishing score" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><div class="score-fill" id="scoreFill"></div></div>
+            <p class="score-explainer" id="scoreExplainer">This is the model's estimated probability for the phishing class. It is not a verified real world risk percentage.</p>
+          </div>
+          <h4 class="feature-heading">URL characteristics supplied to the model</h4>
+          <div class="feature-grid" id="featureGrid"></div>
+          <div class="risk-reminder"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 3 2.8 20h18.4L12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 9v5M12 17.2v.1" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg><span><strong>Remember:</strong> a legitimate prediction is not a guarantee that a website is safe. Check the address carefully and avoid entering sensitive information when in doubt.</span></div>
+        </div>
+      </section>
+    </section>
+
+    <section class="content-section" id="how-it-works">
+      <div class="section-intro">
+        <span class="section-kicker">System overview</span>
+        <h2>How the system works</h2>
+        <p>The project has a training stage and a prediction stage. Training creates the model file; the running backend uses that saved model to analyze URLs submitted from this page.</p>
+      </div>
+      <div class="steps-grid">
+        <article class="step-card"><div class="step-number">01</div><h3>Load labeled examples</h3><p><code>phishing_dataset.csv</code> contains URL examples labeled <em>legitimate</em> or <em>phishing</em>. The labels provide the answers used during training.</p></article>
+        <article class="step-card"><div class="step-number">02</div><h3>Extract URL features</h3><p><code>url_features.py</code> turns each URL into numeric values covering URL length, host structure, path and query patterns, suspicious terms, and hostname entropy.</p></article>
+        <article class="step-card"><div class="step-number">03</div><h3>Train the classifier</h3><p><code>train_model.py</code> trains a hybrid classifier using domain character n-grams and numeric URL features. It evaluates on held out registrable domains and saves <code>phishing_model.pkl</code>.</p></article>
+        <article class="step-card"><div class="step-number">04</div><h3>Submit a URL</h3><p>This page sends the submitted text to the local Flask API at <code>127.0.0.1:5000/predict</code>. The submitted website is not opened.</p></article>
+        <article class="step-card"><div class="step-number">05</div><h3>Generate a prediction</h3><p>The backend extracts numeric features, encodes hostname character n-grams, and combines both signals. A narrow homepage rule recognizes selected exact HTTPS homepages but never automatically trusts arbitrary subpages.</p></article>
+        <article class="step-card"><div class="step-number">06</div><h3>Review the result</h3><p>The page shows the prediction, estimated phishing score, and feature values. The feature list describes the model inputs, not the exact cause of its decision.</p></article>
+      </div>
+    </section>
+
+    <section class="content-section" id="user-guide">
+      <div class="section-intro">
+        <span class="section-kicker">Getting started</span>
+        <h2>How to use the application</h2>
+        <p>On your computer, the backend and frontend run in two separate PowerShell windows. You only need to train the model again if the model file is missing or the data or feature logic changes.</p>
+      </div>
+      <div class="guide-grid">
+        <article class="content-card guide-block">
+          <h3>Start the application on Windows</h3>
+          <p class="card-description">Run these commands from the folder containing <code>app.py</code> and <code>index.html</code>.</p>
+          <div class="command-group">
+            <div class="command-title"><span>1. Train the model, first run only</span><span class="terminal-label">PowerShell</span></div>
+            <div class="code-block"><code> .\.venv\Scripts\python.exe train_model.py</code><button class="copy-button" type="button" data-copy=".\.venv\Scripts\python.exe train_model.py">Copy</button></div>
+          </div>
+          <div class="command-group">
+            <div class="command-title"><span>2. Start the Python backend</span><span class="terminal-label">Terminal 1</span></div>
+            <div class="code-block"><code> .\.venv\Scripts\python.exe app.py</code><button class="copy-button" type="button" data-copy=".\.venv\Scripts\python.exe app.py">Copy</button></div>
+            <p class="card-description" style="margin:8px 0 0">Leave this window open. It runs the API on port 5000.</p>
+          </div>
+          <div class="command-group">
+            <div class="command-title"><span>3. Start the website server</span><span class="terminal-label">Terminal 2</span></div>
+            <div class="code-block"><code>py -3.12 -m http.server 8000</code><button class="copy-button" type="button" data-copy="py -3.12 -m http.server 8000">Copy</button></div>
+            <p class="card-description" style="margin:8px 0 0">Run from the project folder, then open <code>http://localhost:8000/index.html</code>.</p>
+          </div>
+          <div class="guide-note"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-width="1.7"/><path d="M12 11v5M12 7.5v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>If you have not installed packages yet, run <code> .\.venv\Scripts\python.exe -m pip install -r requirements.txt</code> first. Stop either server with <code>Ctrl+C</code>.</span></div>
+        </article>
+        <article class="content-card">
+          <h3>Reading the result</h3>
+          <p class="card-description">The percentage refers to the model's phishing class, regardless of which label was predicted.</p>
+          <div class="workflow">
+            <div class="workflow-item"><div class="workflow-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3 3.5 7.5v5c0 4.3 3.2 7 8.5 8.5 5.3-1.5 8.5-4.2 8.5-8.5v-5L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="m8.5 12 2.2 2.2 4.7-4.7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><h4>No phishing indicators detected by the model</h4><p>The model predicted the legitimate class for this URL. It has not verified the website or guaranteed that it is safe.</p></div></div>
+            <div class="workflow-item"><div class="workflow-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 3 2.8 20h18.4L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M12 9v5M12 17.2v.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div><div><h4>Potential phishing URL</h4><p>The model predicted the phishing class. Treat it cautiously and independently verify the address before doing anything sensitive.</p></div></div>
+            <div class="workflow-item"><div class="workflow-icon" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M4 19V5m0 14h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="m7 15 4-4 3 2 5-6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><h4>Estimated phishing score</h4><p>This is the classifier's <code>predict_proba</code> output for the phishing class. It is a model score, not a calibrated real world risk estimate.</p></div></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-section" id="features">
+      <div class="section-intro">
+        <span class="section-kicker">Model inputs</span>
+        <h2>URL features used by the model</h2>
+        <p>The classifier receives both numeric hostname and URL structure features and character n-grams from the hostname. Character n-grams let it learn patterns inside the domain name without treating every unseen domain as automatically safe or dangerous. The signals help classification but do not explain every individual prediction.</p>
+      </div>
+      <div class="feature-explainer">
+        <div class="feature-explainer-item"><div class="feature-mini-icon">LEN</div><div><strong>URL length</strong><span>Number of characters in the submitted URL.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">.</div><div><strong>Dots</strong><span>Number of periods in the full URL.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">−</div><div><strong>Hyphens</strong><span>Number of hyphen characters.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">/</div><div><strong>Slashes</strong><span>Number of slash characters.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">_</div><div><strong>Underscores</strong><span>Number of underscore characters.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">@</div><div><strong>At symbols</strong><span>Number of @ characters in the URL.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">TLS</div><div><strong>HTTPS scheme</strong><span>1 if the URL uses HTTPS, otherwise 0. HTTPS alone does not mean a site is trustworthy.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">123</div><div><strong>Digit count</strong><span>Number of numeric characters in the URL.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">SUB</div><div><strong>Subdomain depth</strong><span>Uses the bundled Public Suffix List snapshot to separate subdomains from the registered domain.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">IP</div><div><strong>IP address host</strong><span>Flags an IPv4 or IPv6 address used directly as the hostname.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">HOST</div><div><strong>Hostname length</strong><span>Number of characters in the hostname, excluding the URL path.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">DOM</div><div><strong>Registered domain</strong><span>Separates the registrable domain from the public suffix and any leading subdomains.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">NGR</div><div><strong>Domain character n-grams</strong><span>Learns short character sequences from hostnames, helping recognize spelling patterns beyond simple character counts.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">URL</div><div><strong>Path, query and encoding</strong><span>Checks path depth, query parameters, percent encoding, suspicious wording, and file extension patterns.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">HYP</div><div><strong>Hostname hyphens</strong><span>Hyphen count inside the hostname rather than across the entire URL.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">123</div><div><strong>Hostname digits</strong><span>Number of digits in the hostname.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">LAB</div><div><strong>Hostname labels</strong><span>Number of hostname parts separated by dots.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">PATH</div><div><strong>Path depth</strong><span>Number of nonempty path segments after the hostname.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">QRY</div><div><strong>Query parameters</strong><span>Count of nonempty query sections separated by ampersands.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">?</div><div><strong>Has query</strong><span>Whether the URL includes a query string.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">#</div><div><strong>Has fragment</strong><span>Whether the URL includes a fragment after the hash symbol.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">IDN</div><div><strong>Punycode hostname</strong><span>Flags hostname labels that start with the xn-- prefix used for encoded internationalized domain labels.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">TXT</div><div><strong>Suspicious hostname terms</strong><span>Counts selected words, such as verify or login, inside the hostname. These are weak signals, not proof.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">TXT</div><div><strong>Suspicious path terms</strong><span>Counts selected words in the path and query. Legitimate sites can use these words too.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">ENT</div><div><strong>Hostname entropy</strong><span>A character diversity measurement that may help identify random looking hostnames.</span></div></div>
+        <div class="feature-explainer-item"><div class="feature-mini-icon">PORT</div><div><strong>Nonstandard port</strong><span>Flags a port other than the usual HTTP or HTTPS port for the selected scheme.</span></div></div>
+      </div>
+    </section>
+
+    <section class="content-section" id="limitations">
+      <div class="section-intro">
+        <span class="section-kicker">Use responsibly</span>
+        <h2>What this prototype can and cannot do</h2>
+        <p>Understanding the limits is part of interpreting a machine learning security result correctly.</p>
+      </div>
+      <div class="limitations">
+        <article class="limit-panel">
+          <h3>What it does</h3>
+          <ul>
+            <li>Extracts structural and hostname aware features from the URL text.</li>
+            <li>Uses a locally saved hybrid classifier that combines hostname character n-grams with structured domain and URL features.</li>
+            <li>Displays the prediction, the raw phishing score, and the URL feature values.</li>
+            <li>Runs without a paid external prediction service.</li>
+          </ul>
+        </article>
+        <article class="limit-panel warning">
+          <h3>What it does not do</h3>
+          <ul>
+            <li>Does not open, crawl, or scan the submitted website.</li>
+            <li>Does not check live domain reputation, domain age, DNS, redirects, or page content. Hostname spelling analysis is not the same as verifying a domain against a current threat intelligence database.</li>
+            <li>A known-domain signal can reduce an obvious false alarm, but it cannot prove that an individual path, repository, download, or user-generated page is safe.</li>
+            <li>Does not guarantee that any URL is safe or malicious.</li>
+            <li>Does not provide a calibrated real world probability of phishing.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="container footer-row">
+      <div><strong>PhishGuard</strong><p>Educational machine learning prototype. Use the output as one signal only, not as a substitute for browser protections or independent security checks.</p></div>
+      <a href="#top">Back to top ↑</a>
+    </div>
+  </footer>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    "use strict";
+
+    const API_BASE = "http://127.0.0.1:5000";
+    const urlForm = document.getElementById("urlForm");
+    const urlInput = document.getElementById("urlInput");
+    const analyzeButton = document.getElementById("analyzeButton");
+    const analyzeButtonText = document.getElementById("analyzeButtonText");
+    const fieldError = document.getElementById("fieldError");
+    const apiStatus = document.getElementById("apiStatus");
+    const apiStatusText = document.getElementById("apiStatusText");
+    const resultCard = document.getElementById("resultCard");
+    const resultIcon = document.getElementById("resultIcon");
+    const resultTitle = document.getElementById("resultTitle");
+    const resultCopy = document.getElementById("resultCopy");
+    const resultBadge = document.getElementById("resultBadge");
+    const submittedUrl = document.getElementById("submittedUrl");
+    const scoreValue = document.getElementById("scoreValue");
+    const scoreLabel = document.getElementById("scoreLabel");
+    const scoreExplainer = document.getElementById("scoreExplainer");
+    const scoreFill = document.getElementById("scoreFill");
+    const scoreTrack = document.getElementById("scoreTrack");
+    const featureGrid = document.getElementById("featureGrid");
+    const domainIdentity = document.getElementById("domainIdentity");
+    const domainIndicators = document.getElementById("domainIndicators");
+    const urlIdentity = document.getElementById("urlIdentity");
+    const urlIndicators = document.getElementById("urlIndicators");
+    const toast = document.getElementById("toast");
+
+    const featureDefinitions = [
+      ["URL length", "url_length"],
+      ["URL digit ratio", "url_digit_ratio"],
+      ["Special character ratio", "url_special_char_ratio"],
+      ["URL entropy", "url_entropy"],
+      ["Percent encoded sequences", "percent_encoded_count"],
+      ["HTTPS scheme", "uses_https"],
+      ["URL at signs", "url_at_signs"],
+      ["Path depth", "path_depth"],
+      ["Query parameter count", "query_parameter_count"],
+      ["Suspicious path terms", "suspicious_path_term_count"],
+      ["Executable style extension", "suspicious_file_extension"],
+      ["Hostname length", "hostname_length"],
+      ["Registered domain length", "registered_domain_length"],
+      ["Public suffix length", "public_suffix_length"],
+      ["Hostname label count", "hostname_label_count"],
+      ["Subdomain count", "subdomain_count"],
+      ["Hostname hyphens", "hostname_hyphen_count"],
+      ["Hostname digit ratio", "hostname_digit_ratio"],
+      ["Hostname entropy", "hostname_entropy"],
+      ["Registered label entropy", "registered_label_entropy"],
+      ["Punycode hostname", "has_punycode"],
+      ["Non-ASCII hostname", "has_non_ascii_hostname"],
+      ["IP address hostname", "has_ip_address"],
+      ["User information syntax", "has_userinfo"],
+      ["Brand term in registered label", "brand_token_in_registered_label"],
+      ["Brand term in subdomain", "brand_token_in_subdomain"],
+      ["Brand mixed with other text", "brand_mismatch_in_registered_label"],
+      ["Suspicious hostname terms", "suspicious_host_term_count"],
+      ["Nonstandard port", "has_nonstandard_port"]
+    ];
+
+    function setApiStatus(kind, label) {
+      apiStatus.className = "api-status" + (kind ? " " + kind : "");
+      apiStatusText.textContent = label;
+    }
+
+    async function checkBackend() {
+      try {
+        const response = await fetch(API_BASE + "/health", { cache: "no-store" });
+        const data = await response.json();
+        if (response.ok && data.model_loaded) {
+          setApiStatus("online", "Backend and model ready");
+        } else if (data && data.model_loaded === false) {
+          setApiStatus("warning", "Model needs training");
+        } else {
+          setApiStatus("warning", "Backend needs attention");
+        }
+      } catch (error) {
+        setApiStatus("offline", "Backend unavailable");
+      }
+    }
+
+    function setFieldError(message) {
+      fieldError.textContent = message || "";
+      urlInput.setAttribute("aria-invalid", message ? "true" : "false");
+    }
+
+    function setLoading(isLoading) {
+      analyzeButton.disabled = isLoading;
+      analyzeButton.classList.toggle("loading", isLoading);
+      analyzeButton.querySelector(".button-icon").style.display = isLoading ? "none" : "block";
+      analyzeButtonText.textContent = isLoading ? "Analyzing URL..." : "Analyze URL";
+    }
+
+    function clearFeatureGrid() {
+      while (featureGrid.firstChild) featureGrid.removeChild(featureGrid.firstChild);
+    }
+
+    function renderFeatures(features) {
+      clearFeatureGrid();
+      featureDefinitions.forEach(([label, key]) => {
+        const item = document.createElement("div");
+        item.className = "feature-item";
+        const labelNode = document.createElement("span");
+        labelNode.className = "feature-label";
+        labelNode.textContent = label;
+        const valueNode = document.createElement("strong");
+        valueNode.className = "feature-value";
+        valueNode.textContent = features && features[key] !== undefined ? String(features[key]) : "N/A";
+        item.append(labelNode, valueNode);
+        featureGrid.appendChild(item);
+      });
+    }
+
+    function renderIndicators(target, items) {
+      while (target.firstChild) target.removeChild(target.firstChild);
+      (Array.isArray(items) && items.length ? items : ["No separate indicator details were returned."]).forEach((itemText) => {
+        const item = document.createElement("li");
+        item.textContent = String(itemText);
+        target.appendChild(item);
+      });
+    }
+
+    function showAnalysisBreakdown(data) {
+      const domain = data.domain_analysis || {};
+      const url = data.url_analysis || {};
+      const hostname = domain.hostname || "Hostname unavailable";
+      const registrable = domain.registered_domain || "Registered domain unavailable";
+      const suffix = domain.public_suffix || "Unknown suffix";
+      domainIdentity.textContent = `Hostname: ${hostname}. Registered domain: ${registrable}. Public suffix: ${suffix}. Subdomain levels: ${Number(domain.subdomain_count || 0)}.`;
+      urlIdentity.textContent = `Path depth: ${Number(url.path_depth || 0)}. Query parameters: ${Number(url.query_parameter_count || 0)}. These are structural observations, not proof of malicious behavior.`;
+      renderIndicators(domainIndicators, domain.indicators);
+      renderIndicators(urlIndicators, url.indicators);
+    }
+
+    function showResult(data) {
+      const recognizedHomepage = data.recognized_homepage === true || data.decision_source === "recognized_major_domain_homepage";
+      const reviewRequired = data.review_required === true || data.decision_source === "known_domain_model_disagreement";
+      const isPhishing = data.is_phishing === true && !recognizedHomepage && !reviewRequired;
+      const scoreNumber = Number(data.phishing_score !== undefined ? data.phishing_score : data.confidence);
+      const score = Number.isFinite(scoreNumber) ? Math.max(0, Math.min(100, scoreNumber)) : 0;
+
+      resultCard.hidden = false;
+      resultCard.className = "result-card " + (isPhishing ? "result-phishing" : reviewRequired ? "result-review" : "result-legitimate");
+      resultIcon.innerHTML = (isPhishing || reviewRequired)
+        ? '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 3 2.8 20h18.4L12 3Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 9v5M12 17.2v.1" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></svg>'
+        : '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 3 3.5 7.5v5c0 4.3 3.2 7 8.5 8.5 5.3-1.5 8.5-4.2 8.5-8.5v-5L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="m8.5 12 2.2 2.2 4.7-4.7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+      if (recognizedHomepage) {
+        resultTitle.textContent = "Recognized major-domain homepage";
+        resultCopy.textContent = data.explanation || "This is an exact HTTPS homepage from the app's built-in recognition list. This is not a live reputation check and does not clear subpages.";
+        resultBadge.textContent = "Homepage rule";
+        scoreLabel.textContent = "Raw model phishing score";
+        scoreExplainer.textContent = "This percentage is the hybrid model's raw score before the limited homepage recognition rule. The rule only applies to the exact HTTPS homepage of a listed domain, not its subpages or query URLs. Neither result guarantees safety.";
+      } else if (reviewRequired) {
+        resultTitle.textContent = data.result_label || "Known domain, but URL needs review";
+        resultCopy.textContent = data.explanation || "The hostname matches a configured major domain, but the model found URL patterns that deserve review. This is not a safe verdict.";
+        resultBadge.textContent = "Mixed signals";
+        scoreLabel.textContent = "Raw model phishing score";
+        scoreExplainer.textContent = "The exact hostname is in the local major-domain list, but the model reports elevated URL risk. Inspect the exact path and page content. The local list is not a live reputation service.";
+      } else {
+        resultTitle.textContent = isPhishing ? "Potential phishing URL" : "No phishing indicators detected by the model";
+        resultCopy.textContent = isPhishing
+          ? "The model predicted the phishing class. Verify this address independently before interacting with it."
+          : "The model predicted the legitimate class. This is not a guarantee that the site is safe.";
+        resultBadge.textContent = isPhishing ? "Caution advised" : "Model prediction";
+        scoreLabel.textContent = "Estimated phishing score";
+        scoreExplainer.textContent = "This is the model's estimated probability for the phishing class. It is not a verified real world risk percentage.";
+      }
+
+      submittedUrl.textContent = data.url || "Submitted URL";
+      scoreValue.textContent = score.toFixed(2) + "%";
+      scoreFill.style.width = score + "%";
+      scoreTrack.setAttribute("aria-valuenow", String(Math.round(score)));
+      renderFeatures(data.features);
+      showAnalysisBreakdown(data);
+    }
+
+    function validateInBrowser(value) {
+      if (!value) return "Enter a URL to analyze.";
+      if (/\s/.test(value)) return "The URL contains spaces. Remove them or encode them before trying again.";
+      let parsed;
+      try {
+        parsed = new URL(value);
+      } catch (error) {
+        return "Enter a complete URL, such as https://example.com.";
+      }
+      if (!(["http:", "https:"].includes(parsed.protocol))) {
+        return "Use a URL starting with http:// or https://.";
+      }
+      if (!parsed.hostname) return "Enter a URL with a hostname, such as https://example.com.";
+      if (value.length > 2048) return "This URL is too long. Please enter a URL under 2,048 characters.";
+      return "";
+    }
+
+    urlForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const url = urlInput.value.trim();
+      const validationMessage = validateInBrowser(url);
+      setFieldError(validationMessage);
+      if (validationMessage) {
+        urlInput.focus();
+        return;
+      }
+
+      setLoading(true);
+      resultCard.hidden = true;
+      try {
+        const response = await fetch(API_BASE + "/predict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url })
+        });
+        let data;
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          throw new Error("The backend returned a response that was not valid JSON.");
+        }
+        if (!response.ok) {
+          throw new Error(data && data.error ? data.error : "The backend could not analyze this URL.");
+        }
+        if (typeof data.is_phishing !== "boolean" || !data.features) {
+          throw new Error("The backend response is missing prediction fields. Check that the correct app.py is running.");
+        }
+        showResult(data);
+        setApiStatus("online", "Backend and model ready");
+      } catch (error) {
+        resultCard.hidden = true;
+        const message = error && error.message ? error.message : "An unexpected error occurred.";
+        setFieldError(message + (message.toLowerCase().includes("failed to fetch") ? " Make sure app.py is running in the first PowerShell window." : ""));
+        if (message.toLowerCase().includes("failed to fetch")) {
+          setApiStatus("offline", "Backend unavailable");
+        }
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    urlInput.addEventListener("input", () => {
+      if (fieldError.textContent) setFieldError("");
+    });
+
+    document.querySelectorAll("[data-example]").forEach((button) => {
+      button.addEventListener("click", () => {
+        urlInput.value = button.getAttribute("data-example") || "";
+        setFieldError("");
+        urlInput.focus();
+      });
+    });
+
+    let toastTimer;
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("visible");
+      window.clearTimeout(toastTimer);
+      toastTimer = window.setTimeout(() => toast.classList.remove("visible"), 1800);
+    }
+
+    document.querySelectorAll("[data-copy]").forEach((button) => {
+      button.addEventListener("click", async () => {
+        const text = button.getAttribute("data-copy") || "";
+        try {
+          await navigator.clipboard.writeText(text);
+          showToast("Command copied");
+        } catch (error) {
+          showToast("Copy is unavailable in this browser. Select the command to copy it.");
+        }
+      });
+    });
+
+    checkBackend();
+  </script>
+</body>
+</html>
